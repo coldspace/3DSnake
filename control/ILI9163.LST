@@ -1,0 +1,548 @@
+C51 COMPILER V9.51   ILI9163                                                               05/02/2016 18:04:02 PAGE 1   
+
+
+C51 COMPILER V9.51, COMPILATION OF MODULE ILI9163
+OBJECT MODULE PLACED IN ILI9163.OBJ
+COMPILER INVOKED BY: F:\Keil\C51\BIN\C51.EXE ILI9163.c LARGE BROWSE DEBUG OBJECTEXTEND PREPRINT
+
+line level    source
+
+   1          /*
+   2           * ILI9163.c
+   3           *
+   4           *  Created on: 2014-7-21
+   5           *      Author: comy
+   6           */
+   7          
+   8          #include "ILI9163.h"
+   9          #include "intrins.h"
+  10          #include "TFT_ascii.h"
+  11          //颜色定义
+  12          uint TFT_color[]={
+  13                          0x07e0,//绿
+  14                          0xf800,//红
+  15                          0xffe0,//黄
+  16                          
+  17                          0x07ff,//青
+  18                          0x001f,//蓝
+  19                          0xf81f,//紫
+  20                          0x0000,//黑
+  21                          0xffff,//白
+  22                          0x7bef //灰
+  23          };
+  24          
+  25          /*延时*/
+  26          void delay_ms(int x)            //@12.000MHz
+  27          {
+  28   1              unsigned char i, j;
+  29   1      
+  30   1              i = 108;
+  31   1              j = 145;
+  32   1              do
+  33   1              {
+  34   2                      while (--j);
+  35   2              } while (--i);
+  36   1      }
+*** WARNING C280 IN LINE 26 OF ILI9163.c: 'x': unreferenced local variable
+  37          
+  38          uchar Flip(uchar Data)
+  39          {
+  40   1              int i;
+  41   1              uchar temp = 0x00;
+  42   1      
+  43   1              for (i = 7;i >= 0;i--)
+  44   1              {
+  45   2                      temp |= ((Data&0x01) << i);
+  46   2                      Data >>= 1; 
+  47   2              }
+  48   1      
+  49   1              return temp;
+  50   1      }
+  51          
+  52          void Delay10us()                //@12.000MHz
+  53          {                                                                                                         
+  54   1      
+C51 COMPILER V9.51   ILI9163                                                               05/02/2016 18:04:02 PAGE 2   
+
+  55   1              unsigned char i;
+  56   1      
+  57   1              i = 2;
+  58   1              while (--i);
+  59   1      }
+  60          
+  61          void Delay100ms()               //@11.0592MHz
+  62          {
+  63   1              unsigned char i, j, k;
+  64   1      
+  65   1              _nop_();
+  66   1              _nop_();
+  67   1              i = 5;
+  68   1              j = 52;
+  69   1              k = 195;
+  70   1              do
+  71   1              {
+  72   2                      do
+  73   2                      {
+  74   3                              while (--k);
+  75   3                      } while (--j);
+  76   2              } while (--i);
+  77   1      }
+  78          
+  79          void TFT_char(uint x,uint y,uint font_color,uint back_color,char ch){
+  80   1              uchar temp , Bytes;
+  81   1              uchar pos,t;
+  82   1              uint  CHAR_W,CHAR_H;  //一个字符的大小
+  83   1      
+  84   1              //CHAR_W = 8;         //8*16
+  85   1              //CHAR_H = 16;
+  86   1      
+  87   1              CHAR_W = 6;         //16*24  字符的大小为16*24
+  88   1              CHAR_H = 8;
+  89   1      
+  90   1              if(x>(TFT_size_x-CHAR_W)||y>(TFT_size_y-CHAR_H))   //如果指定的字符显示的位置超过了彩屏的分辨率，则返回
+  91   1                      return;
+  92   1              LCD_SetPos( Flip(y), Flip(y+CHAR_H-1),Flip(x), Flip(x+CHAR_W-1)); //设置字符显示的地址范围
+  93   1              ch = ch-32;                       //按照ASCII编码顺序得到相应字母的编码
+  94   1              Bytes = (CHAR_W*CHAR_H)/8; //每个字母取模字节数  一个字节为8位，也即是8个像素点是一个字节
+  95   1              for(pos=0;pos<Bytes;pos++)  //一个字节一个字节的写入，知道这个字符的全部字节数写完
+  96   1              {
+  97   2                      // temp= Font8x16[ch][pos];  //8*16的字体
+  98   2                      temp= Font6x8[ch][pos];  //字体的大小为16*24
+  99   2                      for(t=0;t<8;t++)   //一个字节为8位，所以要循环8次写入，一次只能写入一个像素点
+ 100   2                      {
+ 101   3                              //判断哪里是显示字符的地方，哪里是背景，然后分别写入不同的颜色就可以了
+ 102   3                              if(temp&0x80)   //如果是显示字符的地方
+ 103   3                                      Write_Data_U16(Flip(font_color));  //textcolor
+ 104   3                              else   //否则就是背景的地方
+ 105   3                                      Write_Data_U16(Flip(back_color));  //backcolor
+ 106   3                              temp<<=1;   //右移一位
+ 107   3                      }
+ 108   2      
+ 109   2              }
+ 110   1      }
+ 111          
+ 112          void TFT_string(uint x,uint y,uint font_color,uint back_color,char *p){
+ 113   1              while(*p!='\0'){        //判断是否到了字符串结尾
+ 114   2                      TFT_char(y,x,font_color,back_color,*p);
+ 115   2                      x+=6;
+ 116   2                      p++;
+C51 COMPILER V9.51   ILI9163                                                               05/02/2016 18:04:02 PAGE 3   
+
+ 117   2              }
+ 118   1      }
+ 119          
+ 120          //写寄存器ID的子程序
+ 121          /******************************************************/
+ 122          void WriteCOM(unsigned char ID)
+ 123          {
+ 124   1      //Flip (ID);
+ 125   1              rs_clr;
+ 126   1      //      Delay10us();
+ 127   1              cs_clr;
+ 128   1              
+ 129   1      
+ 130   1      //      Delay10us();
+ 131   1              TFT_DATA=0x00;
+ 132   1      //      Delay10us();
+ 133   1      
+ 134   1              rw_clr;
+ 135   1              Delay10us();
+ 136   1              rw_set;
+ 137   1      
+ 138   1      //      Delay10us();
+ 139   1              TFT_DATA=(ID);
+ 140   1      //      Delay10us();
+ 141   1      
+ 142   1              rw_clr;
+ 143   1              Delay10us();
+ 144   1              rw_set;
+ 145   1      //      Delay10us();
+ 146   1              rs_set;
+ 147   1      //      Delay10us();
+ 148   1              cs_set;
+ 149   1      }
+ 150          /******************************************************
+ 151          写数据的子程序
+ 152          ******************************************************/
+ 153          void WriteDAT(unsigned char HD,unsigned char LD) //写16位数据
+ 154          {
+ 155   1       //Flip (HD);
+ 156   1      //Flip (LD);    
+ 157   1      
+ 158   1              rs_set;
+ 159   1      //      Delay10us();
+ 160   1              cs_clr;
+ 161   1      //      Delay10us();
+ 162   1      
+ 163   1              TFT_DATA=(HD);
+ 164   1              rw_clr;
+ 165   1              Delay10us();
+ 166   1              rw_set; 
+ 167   1      //      Delay10us();
+ 168   1      
+ 169   1              TFT_DATA=(LD);
+ 170   1              rw_clr;
+ 171   1              Delay10us();
+ 172   1              rw_set;
+ 173   1      //      Delay10us();
+ 174   1              rs_clr;
+ 175   1      //      Delay10us();
+ 176   1              cs_set;
+ 177   1      }
+ 178          void WriteDAT_8(unsigned char ddate)     //写8位数据
+C51 COMPILER V9.51   ILI9163                                                               05/02/2016 18:04:02 PAGE 4   
+
+ 179          {
+ 180   1      //Flip (ddate);         
+ 181   1      
+ 182   1              rs_set;
+ 183   1      //      Delay10us();
+ 184   1              cs_clr;
+ 185   1      //      Delay10us();
+ 186   1              
+ 187   1              TFT_DATA=(ddate);
+ 188   1              rw_clr;
+ 189   1              Delay10us();
+ 190   1              rw_set;
+ 191   1              Delay10us();
+ 192   1              
+ 193   1              rs_clr;
+ 194   1      //      Delay10us();
+ 195   1              cs_set;
+ 196   1              
+ 197   1      }
+ 198          /******************************************************
+ 199          用于写字符，图线等
+ 200          *****************************************************/
+ 201          void Write_Data_U16(unsigned int y)
+ 202          {
+ 203   1              unsigned char m,n;
+ 204   1              m=y>>8; //高8位
+ 205   1              n=y; //低8位
+ 206   1              WriteDAT(m,n);
+ 207   1      }
+ 208          
+ 209          /******************************************************
+ 210          IC ILI9163初始化
+ 211          ******************************************************/
+ 212          void ILI9163_init(void)
+ 213          {
+ 214   1              rst_set;
+ 215   1              delay_ms(10);
+ 216   1              rst_clr;
+ 217   1              delay_ms(10);
+ 218   1              rst_set;
+ 219   1              delay_ms(10);
+ 220   1              WriteCOM(0x88);//退出睡眠模式
+ 221   1              delay_ms(10);
+ 222   1              WriteCOM(0x64);// Gammut format 伽马曲线设置
+ 223   1              WriteDAT_8(0x20);
+ 224   1              /* 04h GC3 Gammut 2.2，01h GC1 Gammut 1.0 , 02h GC2 gammut 1.8, 08h GC3 Gammut 2.5 */
+ 225   1      
+ 226   1              delay_ms(10);
+ 227   1              WriteCOM(0x8d);   //帧频控制
+ 228   1              WriteDAT_8(0x60);
+ 229   1              WriteDAT_8(0x10);
+ 230   1              WriteDAT_8(0x90);
+ 231   1      
+ 232   1              WriteCOM(0x03);   //电源控制
+ 233   1              WriteDAT_8(0x20);
+ 234   1              WriteDAT_8(0x00);
+ 235   1      
+ 236   1              WriteCOM(0x83);   //电源控制
+ 237   1              WriteDAT_8(0xe0);
+ 238   1      
+ 239   1              WriteCOM(0xa3);   //偏压控制
+ 240   1              WriteDAT_8(0x32);  //vcom control 0x48,0x24 34 //2b
+C51 COMPILER V9.51   ILI9163                                                               05/02/2016 18:04:02 PAGE 5   
+
+ 241   1              WriteDAT_8(0x1c);  //vcom control 0x48,0x24 50 //47
+ 242   1      
+ 243   1              WriteCOM(0xe3);   //偏压控制
+ 244   1              WriteDAT_8(0x02);  //C4
+ 245   1      
+ 246   1              delay_ms(10);
+ 247   1      
+ 248   1              WriteCOM(0x5c);   // Interface Pixel mode
+ 249   1              WriteDAT_8(0xa0);
+ 250   1              /*0x05 16 bit/Pixel RGB 53-35 Twice per pixel for 80-8bits parallel
+ 251   1              0x06 18 bit/Pixel RGB 6-6-6 Three times per pixel for 80-8bits parallel */
+ 252   1      
+ 253   1              WriteCOM(0x6c);  //扫描方向控制
+ 254   1              //WriteDAT_8(0x15); //
+ 255   1              //WriteDAT_8(0x16);
+ 256   1              WriteDAT_8(0x14);
+ 257   1              //WriteDAT_8(0x17);
+ 258   1      
+ 259   1              WriteCOM(0xed);
+ 260   1              WriteDAT_8(0x00); //
+ 261   1      
+ 262   1              WriteCOM(0x4f);
+ 263   1              WriteDAT_8(0x80);
+ 264   1              delay_ms(10);
+ 265   1      
+ 266   1              // t Gamma,伽马曲线设置
+ 267   1              WriteCOM(0x07);// Positive 05
+ 268   1              WriteDAT_8(0x90);//1
+ 269   1              WriteDAT_8(0x68);//2
+ 270   1              WriteDAT_8(0x90);//3
+ 271   1              WriteDAT_8(0xe4);//4
+ 272   1              WriteDAT_8(0x74);//5
+ 273   1              WriteDAT_8(0xa4);//6
+ 274   1              WriteDAT_8(0x38);//7
+ 275   1              WriteDAT_8(0x04);//8
+ 276   1              WriteDAT_8(0x78);//9
+ 277   1              WriteDAT_8(0x58);//10
+ 278   1              WriteDAT_8(0x24);//11
+ 279   1              WriteDAT_8(0xb4);//12
+ 280   1              WriteDAT_8(0x20);//13
+ 281   1              WriteDAT_8(0xa0);//14
+ 282   1              WriteDAT_8(0x40);//15
+ 283   1              WriteDAT_8(0x70);//16
+ 284   1              WriteCOM(0x87); // Negative
+ 285   1              WriteDAT_8(0xd0);//1
+ 286   1              WriteDAT_8(0x28);//2
+ 287   1              WriteDAT_8(0x90);//3
+ 288   1              WriteDAT_8(0x64);//4
+ 289   1              WriteDAT_8(0xe4);//5
+ 290   1              WriteDAT_8(0x44);//6
+ 291   1              WriteDAT_8(0x38);//7
+ 292   1              WriteDAT_8(0x04);//8
+ 293   1              WriteDAT_8(0xb8);//9
+ 294   1              WriteDAT_8(0x58);//10
+ 295   1              WriteDAT_8(0xa4);//11
+ 296   1              WriteDAT_8(0xb4);//12
+ 297   1              WriteDAT_8(0x60);//13
+ 298   1              WriteDAT_8(0x60);//14
+ 299   1              WriteDAT_8(0x40);//15
+ 300   1              WriteDAT_8(0xf0);//16
+ 301   1      
+ 302   1              WriteCOM(0x94); //Display on
+C51 COMPILER V9.51   ILI9163                                                               05/02/2016 18:04:02 PAGE 6   
+
+ 303   1              delay_ms(10);
+ 304   1              WriteCOM(0x34); //write to RAM
+ 305   1      }
+ 306          
+ 307          /******************************************************
+ 308          地址设置
+ 309          ******************************************************/
+ 310          void add_rst(void)   //地址重置
+ 311          {
+ 312   1              WriteCOM(0x54);      //Colulm addRSTs set
+ 313   1              WriteDAT_8(0x00);
+ 314   1              WriteDAT_8(0x00);
+ 315   1              WriteDAT_8(0x00);
+ 316   1              WriteDAT_8(0xf9);
+ 317   1      
+ 318   1              WriteCOM(0xd4);      //Colulm addRSTs set
+ 319   1              WriteDAT_8(0x00);
+ 320   1              WriteDAT_8(0x00);
+ 321   1              WriteDAT_8(0x00);
+ 322   1              WriteDAT_8(0x01);
+ 323   1      
+ 324   1              WriteCOM(0x34);      //Write Data to GRAM          
+ 325   1      }
+ 326          void LCD_SetPos(unsigned int x0,unsigned int x1,unsigned int y0,unsigned int y1)
+ 327          {
+ 328   1              WriteCOM(0x54);    //Colulm addRSTs set
+ 329   1              WriteDAT_8(x0>>8);  //取x0的高8位
+ 330   1              WriteDAT_8(x0);     //取x0的低8位
+ 331   1      
+ 332   1              WriteDAT_8(x1>>8);
+ 333   1              WriteDAT_8(x1);
+ 334   1      
+ 335   1              WriteCOM(0xd4);      //Colulm addRSTs set
+ 336   1              WriteDAT_8(y0>>8);
+ 337   1              WriteDAT_8(y0);
+ 338   1      
+ 339   1              WriteDAT_8(y1>>8);
+ 340   1              WriteDAT_8(y1);
+ 341   1      
+ 342   1              WriteCOM(0x34);      //Write Data to GRAM
+ 343   1      }
+ 344          /*****************************************************
+ 345          函数名：display()
+ 346          功能：显示整屏颜色，颜色由d1,d2决定
+ 347          ******************************************************/
+ 348          void display(unsigned int colour)
+ 349          {
+ 350   1      
+ 351   1              unsigned int c,s;
+ 352   1              add_rst(); 
+ 353   1              for(c=0;c<160;c++)    //横向扫描
+ 354   1              {
+ 355   2                 for(s=0;s<128;s++)
+ 356   2                 {
+ 357   3                       WriteDAT(colour>>8,colour);
+ 358   3                 }
+ 359   2              }
+ 360   1              delay_ms(200);
+ 361   1      }
+ 362          /******************************************************
+ 363          函数名：LCD_ico
+ 364          功能：在起始位置为xs、ys，宽x、高y的区域内写入大小
+C51 COMPILER V9.51   ILI9163                                                               05/02/2016 18:04:02 PAGE 7   
+
+ 365          为x*y的图像ico
+ 366          ******************************************************/
+ 367          void LCD_ico(unsigned char xs,unsigned char ys,unsigned char x,unsigned char y,unsigned char ico[])
+ 368          {
+ 369   1              unsigned int i;
+ 370   1              LCD_SetPos(xs,xs+x-1,ys,ys+y-1);
+ 371   1              for(i=0;i<x*y*2-1;i=i+2)    //
+ 372   1              {
+ 373   2                 WriteDAT(ico[i],ico[i+1]);    //
+ 374   2              }
+ 375   1      }
+ 376          /******************************************************
+ 377          函数名：LCD_clear
+ 378          功能：在起始位置为xs、ys，宽x、高y的区域内写白色
+ 379          *****************************************************/
+ 380          void LCD_clear(unsigned char xs,unsigned char ys,unsigned char x,unsigned char y)
+ 381          {
+ 382   1              unsigned int i;
+ 383   1              LCD_SetPos(xs,xs+x-1,ys,ys+y-1);
+ 384   1              for(i=0;i<x*y*2-2;i=i+2)    //
+ 385   1              {
+ 386   2                 WriteDAT(0xff,0xff);    //
+ 387   2              }
+ 388   1      }
+ 389          
+ 390          /******************************************************
+ 391          函数名：LCD_write_kong
+ 392          功能：写空白显示在编号x位置
+ 393          ******************************************************/
+ 394          void LCD_write_kong(unsigned char y)
+ 395          {
+ 396   1              unsigned char m,n;
+ 397   1                 LCD_SetPos((y%3)*42+y%3,(y%3)*42+42-1+y%3,(y/3)*42+y/3,(y/3)*42+42-1+y/3); //ram ready
+ 398   1              for(n=0;n<42;n++) //
+ 399   1              for(m=0;m<42;m++)
+ 400   1              {
+ 401   2                 WriteDAT(0xFF,0x77); //暂定为 色
+ 402   2              }
+ 403   1      }
+ 404          /******************************************************
+ 405          函数名：LCD_write_part
+ 406          功能：从图片数组中取出对应于x的部分显示在编号y位置上
+ 407             每一小部分大小暂定为42x42。
+ 408          ******************************************************/
+ 409          void LCD_write_part(unsigned char y,unsigned char x,unsigned char img[])
+ 410          {
+ 411   1              unsigned char m,n;
+ 412   1                 LCD_SetPos((y%3)*42+y%3,(y%3)*42+42-1+y%3,(y/3)*42+y/3,(y/3)*42+42-1+y/3); //ram ready
+ 413   1              if(x==8)
+ 414   1                 LCD_write_kong(y);
+ 415   1              else
+ 416   1              {
+ 417   2                 for(n=0;n<42;n++)
+ 418   2                 {
+ 419   3                       for(m=0;m<42;m++)
+ 420   3                          {
+ 421   4                           WriteDAT(img[2*(m+126*n+42*(x%3)+126*42*(x/3))],img[2*(m+126*n+42*(x%3)+126*42*(x/3))+1]);    //
+ 422   4                          }
+ 423   3                      }
+ 424   2              }
+ 425   1      }
+ 426          
+C51 COMPILER V9.51   ILI9163                                                               05/02/2016 18:04:02 PAGE 8   
+
+ 427          /******************************************************
+ 428          第x列，第y行，颜色fColor
+ 429          *****************************************************/
+ 430          void LCD_bot(uchar x,uchar y,unsigned int fColor)
+ 431          {
+ 432   1              LCD_SetPos(Flip(x),Flip(x+1),Flip(y),Flip(y+1));
+ 433   1              Write_Data_U16(fColor);
+ 434   1      }
+ 435          
+ 436          /******************************************************
+ 437          自测试程序，正屏刷8种颜色
+ 438          *******************************************************/
+ 439          void TFT_Test()
+ 440          {
+ 441   1              unsigned char i;  
+ 442   1              
+ 443   1              ILI9163_init();
+ 444   1              for(i=0;i<8;i++)
+ 445   1              {               
+ 446   2                      display(TFT_color[i]);   //white FULL
+ 447   2                      Delay100ms();
+ 448   2              }
+ 449   1      }
+ 450          
+ 451          void write_ascii(uchar x,uchar y,char p)
+ 452          {
+ 453   1              int i,n,temp,x0 = x;
+ 454   1              for (i = 0;i < 6; i++)
+ 455   1              {
+ 456   2                      temp = 0x80;
+ 457   2                      for (n = 0;n < 8;n++)                              
+ 458   2                      {
+ 459   3                              if ( (Font6x8[p - 32][i] & temp))
+ 460   3                              {       
+ 461   4                                      LCD_bot(y,x,TFT_color[0]);
+ 462   4                              }
+ 463   3                              else 
+ 464   3                              {
+ 465   4                                      LCD_bot(y,x,TFT_color[7]);      
+ 466   4                              }       
+ 467   3                              
+ 468   3                              x --;                                                             
+ 469   3      
+ 470   3                              temp >>= 1;
+ 471   3                      }
+ 472   2                      y ++;
+ 473   2                      x = x0;
+ 474   2              }       
+ 475   1      }
+ 476          
+ 477          void write_ascii_string(uint y,uint x,char *p)
+ 478          {
+ 479   1              while(*p!='\0')
+ 480   1              {       
+ 481   2              //判断是否到了字符串结尾        
+ 482   2                      write_ascii(x,y,*p);
+ 483   2                      y+=6;
+ 484   2                      p++;
+ 485   2              }       
+ 486   1      }
+ 487          
+ 488          void dispaly_byte(int y,uchar P)
+C51 COMPILER V9.51   ILI9163                                                               05/02/2016 18:04:02 PAGE 9   
+
+ 489          {
+ 490   1              int i;
+ 491   1              uchar temp;     
+ 492   1      
+ 493   1              temp =  0x80;
+ 494   1              for (i = 0;i < 8;i ++)
+ 495   1              {       
+ 496   2                      if ( !(P&temp))
+ 497   2                      {       
+ 498   3                              write_ascii_string(3+i*7,y,"0");        
+ 499   3                      }
+ 500   2                      else 
+ 501   2                      {
+ 502   3                              write_ascii_string(3+i*7,y,"1");        
+ 503   3                      }
+ 504   2                      
+ 505   2                      temp >>= 1;     
+ 506   2              }
+ 507   1                      
+ 508   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2360    ----
+   CONSTANT SIZE    =      4    ----
+   XDATA SIZE       =    600      90
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  1 WARNING(S),  0 ERROR(S)

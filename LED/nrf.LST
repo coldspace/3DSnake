@@ -1,0 +1,215 @@
+C51 COMPILER V9.51   NRF                                                                   05/02/2016 19:15:46 PAGE 1   
+
+
+C51 COMPILER V9.51, COMPILATION OF MODULE NRF
+OBJECT MODULE PLACED IN nrf.OBJ
+COMPILER INVOKED BY: F:\Keil\C51\BIN\C51.EXE nrf.c COMPACT BROWSE INCDIR(..\nrf_rx) DEBUG OBJECTEXTEND PREPRINT
+
+line level    source
+
+   1          # ifndef __NRF_C__
+   2          # define __NRF_C__
+   3          # include "nrf.h"
+   4          
+   5          uchar code TX_ADDRESS[TX_ADR_WIDTH] = {0x34,0x43,0x10,0x10,0x01};
+   6          uchar code RX_ADDRESS[RX_ADR_WIDTH] = {0x34,0x43,0x10,0x10,0x01};
+   7          uchar TX_BUF[TX_PLOAD_WIDTH];
+   8          uchar RX_BUF[RX_PLOAD_WIDTH];
+   9          
+  10          char SPI_write_read_bety (char dete)              //基层函数
+  11          {
+  12   1              uint i; 
+  13   1      
+  14   1              for (i = 0;i < 8;i ++)
+  15   1              {
+  16   2                      MOSI = dete&0x80;
+  17   2                      dete <<= 1;
+  18   2                      SCK = 1;
+  19   2                      dete |= MISO;
+  20   2                      SCK = 0;
+  21   2              }
+  22   1              
+  23   1              nops();
+  24   1      
+  25   1              return dete;
+  26   1      }
+  27          
+  28          char SPI_RW_REG (char reg,char value)                   //寄存器访问函数
+  29          {
+  30   1              char status;
+  31   1      
+  32   1              CSN = 0;
+  33   1              status = SPI_write_read_bety (reg); 
+  34   1              SPI_write_read_bety (value);                            //写数据到寄存器
+  35   1              CSN = 1;
+  36   1              return status;
+  37   1      }
+  38          
+  39          char SPI_READ (uchar reg)                                               //读取寄存器的值
+  40          {
+  41   1              uchar reg_val;
+  42   1      
+  43   1              CSN = 0;
+  44   1              SPI_write_read_bety (reg);
+  45   1              reg_val = SPI_write_read_bety (0xff);
+  46   1              CSN = 1;
+  47   1              return reg_val;
+  48   1      }
+  49          
+  50          char SPI_READ_BUF (char reg,char *pBuf,char bytes)                //接受缓冲区访问函数    连续读取多个数据
+  51          {
+  52   1              uchar status,byte_ctr;
+  53   1      
+  54   1              CSN = 0;
+  55   1              status = SPI_write_read_bety (reg);
+C51 COMPILER V9.51   NRF                                                                   05/02/2016 19:15:46 PAGE 2   
+
+  56   1      
+  57   1              for (byte_ctr = 0;byte_ctr < bytes;byte_ctr ++)
+  58   1              {
+  59   2                      pBuf[byte_ctr] = SPI_write_read_bety (0xff);
+  60   2              }
+  61   1              CSN = 1;
+  62   1              return status;
+  63   1      }
+  64          
+  65          char SPI_WRITE_BUF (char reg,char *pBuf,char bytes)              //发射缓冲区访问函数    连续写入多个数据
+  66          {
+  67   1              char status,byte_str;
+  68   1              
+  69   1              CSN = 0;
+  70   1              status = SPI_write_read_bety (reg);
+  71   1              nops();
+  72   1              for (byte_str = 0;byte_str < bytes;byte_str ++)
+  73   1              {
+  74   2                      SPI_write_read_bety (*pBuf ++);
+  75   2              }
+  76   1              CSN = 1;
+  77   1              return status ;         
+  78   1      }
+  79          
+  80          void RX_MODE ()                   //设定24l0l的接受方式
+  81          {
+  82   1              CE = 0;
+  83   1              SPI_WRITE_BUF (WRITE_REG + RX_ADDR_P0,RX_ADDRESS,TX_ADR_WIDTH);                 //接受设备接受通道为0，使用和发射设备
+             -相同的发射地址
+  84   1              SPI_RW_REG(WRITE_REG + EN_AA, 0x01);                            // 使通道0可以自动应答   
+  85   1              SPI_RW_REG(WRITE_REG + EN_RXADDR, 0x01);                        // 使能接受到通道0    
+  86   1              SPI_RW_REG(WRITE_REG + RF_CH, 40);                              // 选择射频通道40  
+  87   1              SPI_RW_REG(WRITE_REG + RX_PW_P0, RX_PLOAD_WIDTH);       // 接受通道0 选择和发送通道相同有效的数据宽度    
+  88   1              SPI_RW_REG(WRITE_REG + RF_SETUP, 0x07);                 // 数据传输率为1Mbps，发射功率0dBm，低噪声放大器增益
+  89   1              SPI_RW_REG(WRITE_REG + CONFIG, 0x0f);                           // CRC使能，16为CRC校检，上电
+  90   1              CE = 1; 
+  91   1      }
+  92          
+  93          void TX_MODE()                    //设定24101的发送模式
+  94          {
+  95   1              CE = 0;        
+  96   1              SPI_WRITE_BUF(WRITE_REG + TX_ADDR, TX_ADDRESS, TX_ADR_WIDTH);           //写入发送地址  
+  97   1              SPI_WRITE_BUF(WRITE_REG + RX_ADDR_P0, RX_ADDRESS, TX_ADR_WIDTH);    //为了应答接受设备，接受通道0地址和发
+             -送地址相同
+  98   1              SPI_WRITE_BUF(WR_TX_PLOAD, TX_BUF, TX_PLOAD_WIDTH); // 写入数据包到TX FIFO中   
+  99   1              SPI_RW_REG(WRITE_REG + EN_AA, 0x01);      // 使通道0能够自动应答    
+ 100   1              SPI_RW_REG(WRITE_REG + EN_RXADDR, 0x01);  // 使能接受到通道0    
+ 101   1              SPI_RW_REG(WRITE_REG + SETUP_RETR, 0x1a); // 自动重发延时等待500us + 86us, 自动重发10次    
+ 102   1              SPI_RW_REG(WRITE_REG + RF_CH, 40);        // 选择射频通道40    
+ 103   1              SPI_RW_REG(WRITE_REG + RF_SETUP, 0x07);   // 数据传输率为1Mbps，发射功率0dBm，低噪声放大器增益   
+ 104   1              SPI_RW_REG(WRITE_REG + CONFIG, 0x0e);     // CRC使能，16为CRC校检，上电 
+ 105   1              CE = 1;
+ 106   1      }
+ 107          
+ 108          uchar nRF24l01_TxPacket(uchar *pBuf)                    //发送数据
+ 109          {
+ 110   1              uchar status;
+ 111   1      
+ 112   1              CE = 0;
+ 113   1              SPI_WRITE_BUF(WR_TX_PLOAD, pBuf, TX_PLOAD_WIDTH);
+ 114   1              CE = 1;
+ 115   1      
+C51 COMPILER V9.51   NRF                                                                   05/02/2016 19:15:46 PAGE 3   
+
+ 116   1              while (IRQ != 0) ;
+ 117   1      
+ 118   1              status = SPI_READ(STATUS);
+ 119   1              SPI_RW_REG(WRITE_REG + STATUS, status);
+ 120   1      
+ 121   1              if (status & MAX_TX)
+ 122   1              {
+ 123   2                      SPI_RW_REG(FLUSH_TX, 0XFF);
+ 124   2                      return MAX_TX;
+ 125   2              }
+ 126   1              if (status & TX_OK)
+ 127   1              {
+ 128   2                      return TX_OK;
+ 129   2              }
+ 130   1              return 0;       
+ 131   1      }
+ 132          
+ 133          
+ 134          //启动NRF24L01发送一次数据
+ 135          //txbuf:待发送数据首地址
+ 136          //返回值:0，接收完成；其他，错误代码
+ 137          uchar NRF24L01_RXPacket(uint *rxbuf)
+ 138          {
+*** WARNING C235 IN LINE 138 OF nrf.c: parameter 1: different types
+ 139   1              uchar status;
+ 140   1      
+ 141   1              status = SPI_READ(STATUS);         //读取状态寄存器的值
+ 142   1              CE = 0;
+ 143   1              SPI_RW_REG(WRITE_REG + STATUS, status);    //清除TX_DS或MAX_RT中断标志
+ 144   1              CE = 1;
+ 145   1      
+ 146   1              if (status & RX_OK)                             //接收到数据
+ 147   1              {
+ 148   2                      SPI_READ_BUF(RD_RX_PLOAD, rxbuf, RX_PLOAD_WIDTH);  //读取数据
+*** WARNING C182 IN LINE 148 OF nrf.c: pointer to different objects
+ 149   2                      SPI_RW_REG(FLUSH_RX, 0XFF);      //清除RX FIFO寄存器
+ 150   2                      return 0;
+ 151   2              }
+ 152   1              return 1;  //没收到任何数据
+ 153   1      }
+ 154          
+ 155          void init_nrf ()         //初始化
+ 156          {
+ 157   1              int i;
+ 158   1              for (i = 0;i < 100;i ++);
+ 159   1              CE = 0;
+ 160   1              SCK = 0;
+ 161   1              CSN = 1;        
+ 162   1      }
+ 163          
+ 164          //检测24L01是否存在
+ 165          //返回值:0，成功;1，失败        
+ 166          uchar NRF24L01_Check(void)
+ 167          {
+ 168   1              uchar buf[5]={0XA5,0XA5,0XA5,0XA5,0XA5};
+ 169   1              uchar i;
+ 170   1                       
+ 171   1              SPI_WRITE_BUF(WRITE_REG+TX_ADDR,buf,5);//写入5个字节的地址.     
+ 172   1              SPI_READ_BUF(TX_ADDR,buf,5); //读出写入的地址  
+ 173   1              for(i=0;i<5;i++)
+ 174   1                      if(buf[i]!=0XA5)
+ 175   1                              break;                                                             
+C51 COMPILER V9.51   NRF                                                                   05/02/2016 19:15:46 PAGE 4   
+
+ 176   1              if(i!=5)
+ 177   1                      return 1;//检测24L01错误
+ 178   1                              
+ 179   1              return 0;                //检测到24L01
+ 180   1      }
+ 181                  
+ 182          #endif
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    578    ----
+   CONSTANT SIZE    =     15    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =     10      20
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  2 WARNING(S),  0 ERROR(S)

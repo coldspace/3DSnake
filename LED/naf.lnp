@@ -1,0 +1,5 @@
+"STARTUP.obj",
+"nrf.obj",
+"nrf24.obj" 
+TO "naf" 
+RAMSIZE(256) 

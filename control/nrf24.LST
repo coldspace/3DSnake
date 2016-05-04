@@ -1,0 +1,198 @@
+C51 COMPILER V9.51   NRF24                                                                 05/02/2016 18:04:02 PAGE 1   
+
+
+C51 COMPILER V9.51, COMPILATION OF MODULE NRF24
+OBJECT MODULE PLACED IN nrf24.OBJ
+COMPILER INVOKED BY: F:\Keil\C51\BIN\C51.EXE nrf24.c LARGE BROWSE DEBUG OBJECTEXTEND PREPRINT
+
+line level    source
+
+   1          # include <STC15F2K60S2.h> 
+   2          # include <stdio.h>
+   3          # include "nrf.h"
+   4          # include "ILI9163.h"
+   5          
+   6          uchar Textpackage[5] = {0};
+   7          uchar keyboard[11] = {0};
+   8          uchar flag = 1,a,i;
+   9          uint addressdisk = 64;
+  10          struct KeyInfo{
+  11                  uchar up;
+  12                  uchar down;
+  13                  uchar left;
+  14                  uchar right;
+  15                  uchar mode;
+  16                  uchar pause;
+  17                  uchar A;
+  18                  uchar B;
+  19                  uchar C;
+  20                  uchar D;
+  21          }keyinfo;
+  22          
+  23          void getkey();
+  24          
+  25          /*引脚、定时器等初始化*/
+  26          void init ()
+  27          {
+  28   1              TMOD = 0x20;
+  29   1              TH1 = 0xfd;
+  30   1              TL1 = 0xfd;
+  31   1              TR1 = 1;
+  32   1              REN = 1;                   //   允许串行接受位
+  33   1              SM0 = 0;                   //   10位异步数据收发（8位数据）/
+  34   1              SM1 = 1;                   //   波特率可变（由定时器1的溢出率控制）
+  35   1              EA = 1;
+  36   1              ES = 1;
+  37   1      
+  38   1              CLK_DIV = 0x20;                          //设置分频
+  39   1              P3M1 = 0x00;
+  40   1              P3M0 = 0x00;
+  41   1      
+  42   1              P2M1 = 0x00;
+  43   1              P2M0 = 0x00;
+  44   1      
+  45   1              P4M1 = 0x00;
+  46   1              P4M0 = 0x00;
+  47   1      
+  48   1              P1M1 = 0x00;
+  49   1              P1M0 = 0x00;
+  50   1      
+  51   1              P0M1 = 0x00;
+  52   1              P0M0 = 0x00; 
+  53   1      
+  54   1              ILI9163_init();
+  55   1              //TX_MODE();
+C51 COMPILER V9.51   NRF24                                                                 05/02/2016 18:04:02 PAGE 2   
+
+  56   1      }
+  57          
+  58          /*串口中断*/
+  59          void ser () interrupt 4
+  60          {
+  61   1              RI = 0;
+  62   1              a = SBUF;
+  63   1      }
+  64          /*串口打印函数*/
+  65          void println(uchar *p)
+  66          {
+  67   1                      int i;
+  68   1                      
+  69   1                      ES = 0;
+  70   1                      TI = 1;while (!TI);
+  71   1                      for (i = 0;i < 5 ;i ++)
+  72   1                              printf (" %d \n",p[i]);
+  73   1                      
+  74   1                      TI = 0;
+  75   1                      ES = 1;
+  76   1              
+  77   1      }
+  78          
+  79          /*在液晶上面显示按下按键的位置*/
+  80          void DisplayKey()
+  81          {
+  82   1              write_ascii(addressdisk+20,30,keyinfo.up + 0x30);
+  83   1              write_ascii(addressdisk-20,30,keyinfo.down + 0x30);
+  84   1              write_ascii(addressdisk,10,keyinfo.left + 0x30);
+  85   1              write_ascii(addressdisk,50,keyinfo.right + 0x30);
+  86   1              
+  87   1              write_ascii(addressdisk,75,keyinfo.mode + 0x30);
+  88   1              write_ascii(addressdisk,95,keyinfo.pause + 0x30);
+  89   1              
+  90   1              write_ascii(addressdisk+15,120,keyinfo.A + 0x30);
+  91   1              write_ascii(addressdisk+15,150,keyinfo.B + 0x30);
+  92   1              write_ascii(addressdisk-15,120,keyinfo.C + 0x30);
+  93   1              write_ascii(addressdisk-15,150,keyinfo.D + 0x30);
+  94   1      }
+  95          
+  96          void main ()
+  97          {
+  98   1              int i; 
+  99   1              init ();
+ 100   1              Textpackage[0] = 0xf5;
+ 101   1              Textpackage[1] = 0x5f;
+ 102   1              
+ 103   1              display(TFT_color[7]);          //屏幕显示为白色
+ 104   1      
+ 105   1              write_ascii_string(30, 80, "Checking 24l01");  //在屏幕上显示 无法找到芯片
+ 106   1              while (NRF24L01_Check())         //判断24l01能否工作
+ 107   1              {
+ 108   2                      init_nrf ();
+ 109   2                      Delay_Nms(200);
+ 110   2              }
+ 111   1              TX_MODE();      //设置无线模块为发送模式
+ 112   1              write_ascii_string(50, 60, "Success!");    //24l01读取成功
+ 113   1              Delay_Nms(5000);
+ 114   1              ILI9163_init();
+ 115   1              display(TFT_color[7]);          //清屏                   
+ 116   1      
+ 117   1              while (1)
+C51 COMPILER V9.51   NRF24                                                                 05/02/2016 18:04:02 PAGE 3   
+
+ 118   1              { 
+ 119   2                      getkey();       
+ 120   2                      while (!nRF24l01_TxPacket(Textpackage))
+ 121   2                      {
+ 122   3                              for (i = 0;i < 500;i ++);
+ 123   3                      }
+ 124   2                      DisplayKey();
+ 125   2              } 
+ 126   1      }
+ 127          
+ 128          void getkey()
+ 129          {
+ 130   1              int i;
+ 131   1              char temp;
+ 132   1              
+ 133   1              P0 = 0xFF;
+ 134   1              P1 = 0xff;
+ 135   1      
+ 136   1              //防止按键冲突 
+ 137   1              //上下不能同时按
+ 138   1              //左右不能同时按
+ 139   1              //B C不能同时按
+ 140   1              //如果不需要检测，则注释掉以下 9行代码
+ 141   1              if ( !((P0 >> 1) & 0x01) )
+ 142   1                      if (!((P0 >> 2) & 0x01))
+ 143   1                              return ;
+ 144   1              if ( !((P0 >> 7) & 0x01) )
+ 145   1                      if ( !((P1 >> 1) & 0x01))
+ 146   1                              return ;
+ 147   1              if ( !((P0 >> 0) & 0x01))
+ 148   1                      if ( !((P0 >> 3) & 0x01))
+ 149   1                              return ;
+ 150   1              
+ 151   1              //将按键信息写入发射缓冲数组
+ 152   1              Textpackage[0] = ~P0;
+ 153   1              Textpackage[1] = ~(P1&0x03);
+ 154   1      
+ 155   1              //将按键信息记录在结构体之中，方便后续的使用
+ 156   1              keyinfo.left = (Textpackage[0] >> 0) & 0x01;
+ 157   1              keyinfo.up   = (Textpackage[0] >> 1) & 0x01;
+ 158   1              keyinfo.down = (Textpackage[0] >> 2) & 0x01;
+ 159   1              keyinfo.right= (Textpackage[0] >> 3) & 0x01;
+ 160   1              keyinfo.mode = (Textpackage[0] >> 4) & 0x01;
+ 161   1              keyinfo.pause= (Textpackage[0] >> 5) & 0x01;
+ 162   1              keyinfo.C    = (Textpackage[0] >> 6) & 0x01;
+ 163   1              keyinfo.D    = (Textpackage[0] >> 7) & 0x01;    
+ 164   1              
+ 165   1              keyinfo.A    = (Textpackage[1] >> 0) & 0x01;
+ 166   1              keyinfo.B    = (Textpackage[1] >> 1) & 0x01;
+ 167   1      }
+*** WARNING C280 IN LINE 130 OF nrf24.c: 'i': unreferenced local variable
+*** WARNING C280 IN LINE 131 OF nrf24.c: 'temp': unreferenced local variable
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    690    ----
+   CONSTANT SIZE    =     30    ----
+   XDATA SIZE       =     31      10
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+C51 COMPILER V9.51   NRF24                                                                 05/02/2016 18:04:02 PAGE 4   
+
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  2 WARNING(S),  0 ERROR(S)

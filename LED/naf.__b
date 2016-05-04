@@ -1,0 +1,5 @@
+TRANSFER
+"STARTUP.obj",
+"nrf.obj",
+"nrf24.obj" 
+TO "naf.LIB"

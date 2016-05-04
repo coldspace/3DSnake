@@ -1,0 +1,7 @@
+"STARTUP.obj",
+"nrf.obj",
+"nrf24.obj",
+"ILI9163.obj",
+"delay_xs.obj" 
+TO "naf" 
+RAMSIZE(256) 
